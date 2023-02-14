@@ -1,0 +1,74 @@
+---
+- name: Deploy and configure LAMP stack and WordPress
+  hosts: webserver
+  become: true
+
+  tasks:
+    # Install Apache web server
+    - name: Install Apache
+      apt:
+        name: apache2
+        state: present
+      notify: restart apache
+
+    # Install MySQL server and create WordPress database and user
+    - name: Install MySQL server
+      apt:
+        name: mysql-server
+        state: present
+      notify: restart mysql
+    - name: Secure MySQL installation
+      mysql_user:
+        name: root
+        password: mypassword
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+        update_password: always
+        check_implicit_admin: yes
+        priv: '*.*:ALL,GRANT'
+        state: present
+    - name: Create MySQL database and user for WordPress
+      mysql_db:
+        name: wordpress
+        state: present
+      mysql_user:
+        name: wpuser
+        password: mypassword
+        priv: 'wordpress.*:ALL'
+        state: present
+
+    # Install PHP and dependencies
+    - name: Install PHP and dependencies
+      apt:
+        name:
+          - php
+          - php-mysql
+          - libapache2-mod-php
+          - php-curl
+          - php-gd
+          - php-mbstring
+          - php-xml
+        state: present
+      notify: restart apache
+
+    # Download and extract WordPress
+    - name: Download and extract WordPress
+      unarchive:
+        src: https://wordpress.org/latest.tar.gz
+        dest: /var/www/html/
+        remote_src: yes
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+  handlers:
+    # Restart Apache
+    - name: restart apache
+      service:
+        name: apache2
+        state: restarted
+
+    # Restart MySQL
+    - name: restart mysql
+      service:
+        name: mysql
+        state: restarted
